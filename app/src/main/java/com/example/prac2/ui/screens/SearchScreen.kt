@@ -11,10 +11,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -73,10 +75,10 @@ val apiService: QuoteApiService = retrofit.create(QuoteApiService::class.java)
 
 @Composable
 fun SearchScreen() {
-    var query by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<Quote>?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var searchResults by rememberSaveable { mutableStateOf<List<Quote>?>(null) }
+    var isLoading by rememberSaveable { mutableStateOf(false) }
+    var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     fun fetchQuotes() {
@@ -94,20 +96,23 @@ fun SearchScreen() {
                     searchResults = response.body()?.results ?: emptyList()
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Неизвестная ошибка"
-                    errorMessage = "Ошибка загрузки: $errorBody"
+                    errorMessage = "Ошибка загрузки."
                     Log.e("API_ERROR", "Ошибка ответа: $errorBody")
                 }
             }
 
             override fun onFailure(call: Call<QuoteResponse>, t: Throwable) {
                 isLoading = false
-                errorMessage = "Ошибка соединения: ${t.message}"
+                errorMessage = "Ошибка соединения."
                 Log.e("API_FAILURE", "Ошибка запроса", t)
             }
         })
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         SearchBar(
             query = query,
             onQueryChange = { query = it },
@@ -120,7 +125,7 @@ fun SearchScreen() {
         when {
             isLoading -> PlaceholderText("Загрузка...")
             errorMessage != null -> ErrorPlaceholder(errorMessage!!, onRetry = { fetchQuotes() })
-            searchResults == null -> PlaceholderText("Введите запрос и нажмите обновить")
+            searchResults == null -> PlaceholderText("Введите запрос и нажмите поиск")
             searchResults!!.isEmpty() -> PlaceholderText("Ничего не найдено")
             else -> QuoteList(searchResults!!)
         }
@@ -129,6 +134,8 @@ fun SearchScreen() {
 
 @Composable
 fun SearchBar(query: String, onQueryChange: (String) -> Unit, onClear: () -> Unit, onRefresh: () -> Unit) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -143,7 +150,10 @@ fun SearchBar(query: String, onQueryChange: (String) -> Unit, onClear: () -> Uni
         },
         trailingIcon = {
             if (query.isNotEmpty()) {
-                IconButton(onClick = onClear) {
+                IconButton(onClick = {
+                    onClear() // Очищаем поле ввода
+                    keyboardController?.hide() // Скрываем клавиатуру
+                }) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = "Очистить")
                 }
             }
